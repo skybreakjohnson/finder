@@ -5,10 +5,17 @@
 # | Script for fast large scale vulnerability scanning with Nmap |
 # | *************************************************************|
 # *--------------------------------------------------------------*
-# Version: 0.1.1dev
 # Large scale discovery and vulnerability scanning 
 # Used tools: Nmap, Zmap, Masscan, Whatweb, Wpscan, Metasploit
 # +++ work in progress +++
+version='0.1.2dev'
+
+
+# check if root
+if [[ $EUID -ne 0 ]]; then
+   echo -e "\033[1;31m[!] You are not root!\033[0m"
+   exit 1
+fi
 
 # install tools
 if [ -f /usr/bin/figlet ]; then echo -e '[i] Figlet is already installed\n'; else (echo -e '[+] Install Figlet...\n'; sudo apt install -y figlet); fi
@@ -23,8 +30,9 @@ if (which msfconsole == 0); then (sudo apt install metasploit-framework); fi
 # banner
 pure_art () { 
 clear;
-figlet "Finder"; 
-echo -e "\033[1;95mLets grep the shit out of it.\033[0m";
+figlet "Finder"
+echo -e "\033[1;37m$version\033[0m"
+echo -e "\033[1;95mLets grep the shit out of it.\033[0m"
 nmap -V | head -n 1;
 echo
 }
@@ -41,7 +49,7 @@ change_directory () {
 }
 
 # define some options
-blacklist='/home/betaperson/vm/192.168.178.149:8000/blacklists/blacklist.txt'
+blacklist=$HOME/'blacklist.txt'
 packets_per_second=40
 bytes_per_second='100K'
 
@@ -77,7 +85,7 @@ nmap_only_scan () {
 	do echo -e "\033[1;92m[+] Hosts: \033[0m $hosts";
 	
 	# show scan time
-	echo -e "\033[1;37m[i] Time:\033[0m " $(cat og.gnmap | tail -n 1 | cut -f11- -d ' ')
+	echo -e "\033[1;37m[i] Time:\033[0m " $(cat og.gnmap | tail -n 1 | cut -f19- -d ' ')
 
 	# scan info
 	echo -e "\033[1;37m[i] \033[1;37mOk, scanning ${hosts} hosts on port ${ports} for ${service} with Nmap...\033[0m";
@@ -99,7 +107,7 @@ nmap_only_scan () {
 	fi;
 
 	# show scan time
-	echo -e "\033[1;37m[i] Time:\033[0m " $(cat og.gnmap | tail -n 1 | cut -f11- -d ' ');
+	echo -e "\033[1;37m[i] Time:\033[0m " $(cat og.gnmap | tail -n 1 | cut -f19- -d ' ');
 
 	# write ip's with found services to file
 	while [ -f $file ]; do
@@ -131,7 +139,7 @@ version_detection () {
 	done;
 
 	# show scan time
-	echo -e "\033[1;37m[i] Time:\033[0m " $(cat og.gnmap | tail -n 1 | cut -f11- -d ' ')
+	echo -e "\033[1;37m[i] Time:\033[0m " $(cat og.gnmap | tail -n 1 | cut -f19- -d ' ')
 }
 
 # ftp_scan
@@ -164,7 +172,7 @@ ftp_scan () {
 		echo -e "\033[1;37m[i] File with hosts:\033[0m $file";
 		
 		# show scan time
-		echo -e "\033[1;37m[i] Time:\033[0m " $(cat og.gnmap | tail -n 1 | cut -f11- -d ' ')
+		echo -e "\033[1;37m[i] Time:\033[0m " $(cat og.gnmap | tail -n 1 | cut -f19- -d ' ')
 }
 
 zmap () {
@@ -187,26 +195,48 @@ zmap () {
 
 metasploit () {
 
-	echo -e "\033[1;37m\n[i] Import hosts to Metasploit? \033[0m"
-	read msf;
-	if [ "${msf}" == 'yes' ]; then
+    echo -e "\033[1;37m[i] Import hosts to Metasploit? \033[0m"
+    read msf
+    echo -e "\033[1;37m[i] (1) Import hosts with services found only without importing service informations, but u can scan again for more precise service informations\n    (2) Import all hosts found ( all services found will be imported! ) \033[0m"
+    read import_hosts
+    if [ "${msf}" == "yes" ] || [ "${import_hosts}" -eq 1 ]; then
+        echo -e "\033[1;37m[i] Do u wanna scan again for ( more precise ) service informations? \033[0m"
+	read precise_service_scan
+	if [ "${precise_service_scan}" == "yes" ]; then
 	    # check if msfb is running, initialize if not
-            if [[ $(sudo msfdb status |grep dead) ]];then
+            while [[ $(sudo msfdb status |grep dead) ]]; do
                 echo -e "\033[1;31m[!] Msfdb not running. \033[0m\n\033[1;37m[i] Msfdb init... \n\033[0m"
-		sudo msfdb init;
-		echo -e "\033[1;37m[i] Starting msfconsole... \033[0m";
-		echo -e "workspace -a finder\nworkspace finder\ndb_import og.xml\nservices -S $service" > test.rc;
-		msfconsole -q -x 'resource test.rc';
-            else
-		echo -e "\033[1;37m[i] Starting msfconsole... \033[0m";
-		echo -e "workspace -a finder\nworkspace finder\ndb_import og.xml\nservices -S $service" > test.rc; 
-		msfconsole -q -x 'resource test.rc';
-	    fi
-	elif [[ "${msf}" -eq 0 ]]; then
-		exit
-	else
-		exit
+	        sudo msfdb init; done
+            echo -e "\033[1;37m[i] Starting msfconsole... \033[0m";
+	    # import hosts with services found only and do a more precise service scan
+	    echo -e "workspace -a finder\nworkspace finder\ndb_import $file\ndb_nmap -Pn -p$ports -sV --version-all -iL $file\nservices -S $service" > test.rc; 
+	    msfconsole -q -x 'resource test.rc';
+        elif [ "${precise_service_scan}" == "no" ]; then
+	    while [[ $(sudo msfdb status |grep dead) ]]; do
+                echo -e "\033[1;31m[!] Msfdb not running. \033[0m\n\033[1;37m[i] Msfdb init... \n\033[0m"
+	        sudo msfdb init; done
+            echo -e "\033[1;37m[i] Starting msfconsole... \033[0m";
+	    # import hosts with services found only ( does not import service information in msfdb! )
+	    echo -e "workspace -a finder\nworkspace finder\ndb_import $file\nhosts" > test.rc; 
+	    msfconsole -q -x 'resource test.rc';
+        else
+	    echo -e "\033[1;37m[i] No option choosed. Yes or no! Bye. \033[0m"
+	    exit
 	fi
+    elif [ "${msf}" == "yes" ] || [ "${import_hosts}" -eq 2 ]; then
+        while [[ $(sudo msfdb status |grep dead) ]]; do
+            echo -e "\033[1;31m[!] Msfdb not running. \033[0m\n\033[1;37m[i] Msfdb init... \n\033[0m"
+	    sudo msfdb init; done
+        echo -e "\033[1;37m[i] Starting msfconsole... \033[0m";
+	# import all hosts found ( all services will be imported! )
+	echo -e "workspace -a finder\nworkspace finder\ndb_import og.xml\nservices -S $service" > test.rc; 
+	msfconsole -q -x 'resource test.rc';
+
+    elif [[ "${msf}" -eq 0 ]]; then
+	exit
+    else
+	exit
+    fi
 }       
 
 user_input () {
@@ -226,7 +256,7 @@ user_input () {
 	service_input
 
 	# erstelle file
-	if [ -z $service ]; then add_quotes_to_file_name=finder.lst; else add_quotes_to_file_name=${service}.lst; fi
+	if [ -z $service ]; then add_quotes_to_file_name=$HOME/'finder.lst'; else add_quotes_to_file_name=${service}.lst; fi
 	file=$(echo $add_quotes_to_file_name | sed -e 's_|_\__g');
 
 
@@ -240,20 +270,20 @@ user_input () {
 # define the service u want to search for
 service_input () {
 	
-	if [ "${ports}" -eq 21 -a "${search_for_vulns}" == "yes" ]; then
-	    echo -e "(1) Anonymous FTP login  (2) FTP Vulns"
-	    read ftp
-	        if [ "${ftp}" -eq 1 ]; then
-		    ftp_scan;
-		    ip_to_file
-		    metasploit
-		elif [ "${ftp}" -eq 2 ]; then
-		    echo "Suck dick cyka"
-	    fi
-	else 
-	    echo -e "\033[1;37m[i] No vulnerability search available
-for this scan. \033[0m"
+    if [ "${ports}" -eq 21 -a "${search_for_vulns}" == "yes" ]; then
+	echo -e "(1) Anonymous FTP login  (2) FTP Vulns"
+	read ftp
+	if [ "${ftp}" -eq 1 ]; then
+            ftp_scan;
+	    ip_to_file
+	    metasploit
+	elif [ "${ftp}" -eq 2 ]; then
+	    echo "Suck dick cyka"
 	fi
+    else 
+	echo -e "\033[1;37m[i] No vulnerability search available
+for this scan. \033[0m"
+    fi
 }
 
 # define scan with nmap only
