@@ -333,7 +333,7 @@ metasploit () {
 	        sudo msfdb init; done
             echo -e "\033[1;37m[i] Starting msfconsole... \033[0m";
 	    # import hosts with services found only and do a more precise service scan
-	    echo -e "workspace -a finder\nworkspace finder\ndb_import $file\ndb_nmap -Pn -p$ports -sV --version-all -iL $file\nservices -S $service" > test.rc; 
+	    echo -e "workspace -a finder\nworkspace finder\ndb_import $file\ndb_nmap -Pn -p$ports -sS -sV -F -T4 -iL $file\nservices -S $service" > test.rc; 
 	    msfconsole -q -x 'resource test.rc';
         elif [ "${precise_service_scan}" == "no" ]; then
 	    while [[ $(sudo msfdb status |grep dead) ]]; do
@@ -341,7 +341,7 @@ metasploit () {
 	        sudo msfdb init; done
             echo -e "\033[1;37m[i] Starting msfconsole... \033[0m";
 	    # import hosts with services found only ( does not import service information in msfdb! )
-	    echo -e "workspace -a finder\nworkspace finder\ndb_import $file\nhosts" > test.rc; 
+	    echo -e "workspace -a finder\nworkspace finder\ndb_import $file\nservices -S $service" > test.rc; 
 	    msfconsole -q -x 'resource test.rc';
         else
 	    echo -e "\033[1;37m[i] No option choosed. Yes or no! Bye. \033[0m"
