@@ -8,8 +8,7 @@
 # Large scale discovery and vulnerability scanning 
 # and more... 
 # +++ work in progress +++
-version='0.2.0-pre-alpha'
-
+version='0.2.2-pre-alpha'
 
 ######################################################################################
 # miscellaneous
@@ -22,7 +21,7 @@ if [[ $EUID -ne 0 ]]; then
 fi
 
 # install tools
-# tools: figlet, nmap, zmap, dmitry, metasploit-framework
+# tools: figlet, nmap, zmap, metasploit-framework
 
 if [ -f /usr/bin/figlet ]; then 
     echo -e '[i] Figlet is already installed\n' 
@@ -170,7 +169,7 @@ nmap_random_scan () {
         services_list=$(echo $service | sed -e 's/|/ /g')
         for service in $services_list; do 
             if [ "cam" == "$service" ]; then 
-                camera_scanner
+                camera_browser
             fi
         done
 }
@@ -333,7 +332,7 @@ metasploit () {
 	        sudo msfdb init; done
             echo -e "\033[1;37m[i] Starting msfconsole... \033[0m";
 	    # import hosts with services found only and do a more precise service scan
-	    echo -e "workspace -a finder\nworkspace finder\ndb_import $file\ndb_nmap -Pn -p$ports -sS -sV -F -T4 -iL $file\nservices -S $service" > test.rc; 
+	    echo -e "workspace -a finder\nworkspace finder\ndb_import $file\ndb_nmap -Pn -sS -sV -F -T4 -iL $file\nservices $hosts" > test.rc; 
 	    msfconsole -q -x 'resource test.rc';
         elif [ "${precise_service_scan}" == "no" ]; then
 	    while [[ $(sudo msfdb status |grep dead) ]]; do
@@ -341,7 +340,7 @@ metasploit () {
 	        sudo msfdb init; done
             echo -e "\033[1;37m[i] Starting msfconsole... \033[0m";
 	    # import hosts with services found only ( does not import service information in msfdb! )
-	    echo -e "workspace -a finder\nworkspace finder\ndb_import $file\nservices -S $service" > test.rc; 
+	    echo -e "workspace -a finder\nworkspace finder\ndb_import $file\nservices $hosts" > test.rc; 
 	    msfconsole -q -x 'resource test.rc';
         else
 	    echo -e "\033[1;37m[i] No option choosed. Yes or no! Bye. \033[0m"
@@ -353,7 +352,7 @@ metasploit () {
 	    sudo msfdb init; done
         echo -e "\033[1;37m[i] Starting msfconsole... \033[0m";
 	# import all hosts found ( all services will be imported! )
-	echo -e "workspace -a finder\nworkspace finder\ndb_import og.xml\nservices -S $service" > test.rc; 
+	echo -e "workspace -a finder\nworkspace finder\ndb_import og.xml\nservices $hosts" > test.rc; 
 	msfconsole -q -x 'resource test.rc';
 
     elif [[ "${msf}" -eq 0 ]]; then
@@ -369,12 +368,12 @@ whois_scanner () {
     read more_info
     if [[ $more_info == "yes" ]]; then
         for i in $(cat /root/finder_scans/$file); do
-            dmitry -iwn $i | grep -iE "(HostIP|HostName|netname|descr|country|role)"
+           whois $i | grep -iE "(HostIP|HostName|netname|descr|country|role)"
         done
     fi
 }
 
-camera_scanner () {
+camera_browser () {
 
     # check if any cameras are found and grep the IP addresses
     if hosts=($(cat $HOME/finder_scans/og.gnmap | grep -iE "(cam)" | sed '/Nmap\|Up/d'| grep -oE '((1?[0-9][0-9]?|2[0-4][0-9]|25[0-5])\.){3}(1?[0-9][0-9]?|2[0-4][0-9]|25[0-5])' | uniq)); then
