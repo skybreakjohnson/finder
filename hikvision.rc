@@ -1,0 +1,6 @@
+workspace -a finder
+workspace finder
+use auxiliary/gather/hikvision_info_disclosure_cve_2017_7921
+db_import cam.lst
+check
+exit

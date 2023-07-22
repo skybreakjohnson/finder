@@ -8,8 +8,7 @@
 # Large scale discovery and vulnerability scanning 
 # and more... 
 # +++ work in progress +++
-version='0.2.2-pre-alpha'
-
+version='0.3.0-pre-alpha'
 ######################################################################################
 # miscellaneous
 ######################################################################################
@@ -112,56 +111,61 @@ nmap_random_scan () {
 	echo -e "\033[1;37m[i] $(nmap -V | head -n 1)\033[m" 
 	# largeiscale nmap scan, check if a blacklist is available
 	if [ -f 'blacklist.txt' ]; then 
-	    sudo nmap -D RND,ME,RND,RND,RND,RND -Pn -T5 --host-timeout=10 --max-retries=1 -p ${ports} -iR ${how_many} --excludefile=${blacklist} -n --open -oA og > /dev/null;
+	    sudo nmap -D RND,ME,RND,RND,RND,RND -Pn -T5 --host-timeout=1m --max-retries=1 -p ${ports} -iR ${how_many} --excludefile=${blacklist} -n --open -oA og > /dev/null;
 	else 
         # scan without a blacklist
             echo -e "\033[1;31m[!] No blacklist is used!\033[0m"
-	    sudo nmap -D RND,ME,RND,RND,RND,RND -Pn -T5 --host-timeout=10 --max-retries=1 -p ${ports} -iR ${how_many} -n --open -oA og > /dev/null;
+	    sudo nmap -D RND,ME,RND,RND,RND,RND -Pn -T5 --host-timeout=1m --max-retries=1 -p ${ports} -iR ${how_many} -n --open -oA og > /dev/null
 	fi
 
 	# write ip's to file
 	while [ -f hosts.lst ]; do
-	    rm hosts.lst; done
-	touch hosts.lst;
+	    rm hosts.lst
+	done
+	touch hosts.lst
 	for i in $(cat og.gnmap |grep -iE "(status)"); do
-		echo $i | grep -oE '((1?[0-9][0-9]?|2[0-4][0-9]|25[0-5])\.){3}(1?[0-9][0-9]?|2[0-4][0-9]|25[0-5])' >> hosts.lst; done;
-		echo -e "\033[1;37m[i] File with hosts:\033[0m hosts.lst";
+		echo $i | grep -oE '((1?[0-9][0-9]?|2[0-4][0-9]|25[0-5])\.){3}(1?[0-9][0-9]?|2[0-4][0-9]|25[0-5])' >> hosts.lst
+	done
+		echo -e "\033[1;37m[i] File with hosts:\033[0m hosts.lst"
 
 	# count hosts
-	for hosts in $(cat og.gnmap | grep -iE "(Ports:)" | uniq | wc -l);
-	do echo -e "\033[1;92m[+] Hosts: \033[0m $hosts";
+	for hosts in $(cat og.gnmap | grep -iE "(Ports:)" | uniq | wc -l)
+	do echo -e "\033[1;92m[+] Hosts: \033[0m $hosts"
 	
 	# show scan time
 	echo -e "\033[1;37m[i] Time:\033[0m " $(cat og.gnmap | tail -n 1 | cut -f19- -d ' ')
 
 	# scan info
-	echo -e "\033[1;37m[i] \033[1;37mOk, scanning ${hosts} hosts on port ${ports} for ${service} with Nmap...\033[0m";
-	done;
+	echo -e "\033[1;37m[i] \033[1;37mOk, scanning ${hosts} hosts on port ${ports} for ${service} with Nmap...\033[0m"
+	done
 
 	# service detection scan
-	sudo nmap -D RND,ME,RND,RND,RND,RND -Pn -T5 --host-timeout=30 -p ${ports} -sV --version-intensity=4 -sS -iL hosts.lst -n --open -oA og > /dev/null;
+	# -T5 default is: -max-rtt-timeout 300ms --min-rtt-timeout 50ms --initial-rtt-timeout 250ms --max-retries 2 --host-timeout 15m --script-timeout 10m
+	sudo nmap -D RND,ME,RND,RND,RND,RND -Pn --defeat-rst-ratelimit --max-rtt-timeout 300ms --initial-rtt-timeout 250ms --host-timeout=2m --script-timeout=2m --max-retries=1 -p80 -sV --version-intensity=4 -sS -iL hosts.lst -n --open -oA og > /dev/null
 
 	# grep services
 	if cat og.gnmap | grep -iE "(${service})" | sed '/Nmap\|Up/d'; then 
 	
-	# show hosts with services found
-	hosts=$(echo -e "\n\033[1;92m[+] ${service} found:\033[0m " $(cat og.gnmap | grep -iE "(${service})" | sed '/Nmap\|Up/d'| grep -oE '((1?[0-9][0-9]?|2[0-4][0-9]|25[0-5])\.){3}(1?[0-9][0-9]?|2[0-4][0-9]|25[0-5])' | uniq)); echo $hosts;
-        fi;	
+	    # show hosts with services found
+	    hosts=$(cat og.gnmap | grep -iE "(${service})" | sed '/Nmap\|Up/d'| grep -oE '((1?[0-9][0-9]?|2[0-4][0-9]|25[0-5])\.){3}(1?[0-9][0-9]?|2[0-4][0-9]|25[0-5])' | uniq); echo -e "\n\033[1;92m[+] ${service} found:\033[0m " $hosts
+    fi	
 	
 	# count hosts with services found
-	if i=$(cat og.gnmap | grep -iE "(${service})" | sed '/Nmap\|Up/d'| grep -oE '((1?[0-9][0-9]?|2[0-4][0-9]|25[0-5])\.){3}(1?[0-9][0-9]?|2[0-4][0-9]|25[0-5])' | uniq | wc -w);
-	then echo -e "\033[1;92m[+] Hosts with services found: \033[0m $i";
-	fi;
+	if i=$(cat og.gnmap | grep -iE "(${service})" | sed '/Nmap\|Up/d'| grep -oE '((1?[0-9][0-9]?|2[0-4][0-9]|25[0-5])\.){3}(1?[0-9][0-9]?|2[0-4][0-9]|25[0-5])' | uniq | wc -w); then 
+	    echo -e "\033[1;92m[+] Hosts with services found: \033[0m $i"
+	fi
 
 	# show scan time
-	echo -e "\033[1;37m[i] Time:\033[0m " $(cat og.gnmap | tail -n 1 | cut -f19- -d ' ');
+	echo -e "\033[1;37m[i] Time:\033[0m " $(cat og.gnmap | tail -n 1 | cut -f19- -d ' ')
 
 	# write ip's with found services to file
 	while [ -f $file ]; do
-	    rm $file; done
-	touch $file;
-	for i in $(cat og.gnmap | grep -iE "(${service})" | sed '/Nmap\|Up/d');do 
-	    echo $i | grep -oE '((1?[0-9][0-9]?|2[0-4][0-9]|25[0-5])\.){3}(1?[0-9][0-9]?|2[0-4][0-9]|25[0-5])' | uniq >> $file; done;
+	    rm $file
+	done
+	touch $file
+	for i in $(cat og.gnmap | grep -iE "(${service})" | sed '/Nmap\|Up/d'); do 
+	    echo $i | grep -oE '((1?[0-9][0-9]?|2[0-4][0-9]|25[0-5])\.){3}(1?[0-9][0-9]?|2[0-4][0-9]|25[0-5])' | uniq >> $file
+	done
 	echo -e "\033[1;37m[i] File with service hosts:\033[0m $file"
 	
 	# check if cameras being searched, if yes asking for camera scan 
@@ -169,6 +173,7 @@ nmap_random_scan () {
         services_list=$(echo $service | sed -e 's/|/ /g')
         for service in $services_list; do 
             if [ "cam" == "$service" ]; then 
+                camera_hikvision_info_disclosure_scanner
                 camera_browser
             fi
         done
@@ -178,21 +183,21 @@ nmap_random_scan () {
 version_detection () {
 
   	# scan info
-	echo -e "\033[1;37m[i] \033[1;37mOk, scanning ${zmap_hosts} hosts on port ${ports} for ${service} with Nmap...\033[0m\n";
+	echo -e "\033[1;37m[i] \033[1;37mOk, scanning ${zmap_hosts} hosts on port ${ports} for ${service} with Nmap...\033[0m\n"
 
 	# service detection scan
-	sudo nmap -D RND,ME,RND,RND,RND,RND -Pn -T5 --host-timeout=30 -p ${ports} -sV --version-intensity=4 -sS -iL ${zmap} -n --open -oA og > /dev/null;
+	sudo nmap -D RND,ME,RND,RND,RND,RND -Pn -T5 --host-timeout=1 --script-timeout=1 --max-retries=2 -p ${ports} -sV --version-intensity=4 -sS -iL ${zmap} -n --open -oA og > /dev/null
 
 	# grep services
-	if cat og.gnmap | grep -iE "(${service})"; 
-	# show hosts
-	then echo -e "\n\033[1;92m[+] ${service} found:\033[0m " $(cat og.gnmap | grep -iE "(${service})" | cut -f2 -d ' ');
-	fi;
+	if cat og.gnmap | grep -iE "(${service})"; then 
+	    # show hosts
+        echo -e "\n\033[1;92m[+] ${service} found:\033[0m " $(cat og.gnmap | grep -iE "(${service})" | cut -f2 -d ' ')
+	fi
 
 	# count hosts with services found
-	for i in $(cat og.gnmap | grep -iE "(${service})" | wc -l);
-	do echo -e "\033[1;37m[i] Hosts: \033[0m $i";
-	done;
+	for i in $(cat og.gnmap | grep -iE "(${service})" | wc -l); do 
+	    echo -e "\033[1;37m[i] Hosts: \033[0m $i"
+	done
 
 	# show scan time
 	echo -e "\033[1;37m[i] Time:\033[0m " $(cat og.gnmap | tail -n 1 | cut -f19- -d ' ')
@@ -201,34 +206,34 @@ version_detection () {
 zmap () {
 
 	echo -e "\033[1;91m[!] Be careful, this scan can and probably will be detected by your ISP. Maybe will result in a disconnect.\033[0m";	
-	new_mac=$(sudo macchanger ${iface} -r | tail -n 1 | cut -f3- -d ' ' | cut -f1 -d '(');
-	echo -e "\033[1;37m${pure_art}\n\n\033[1;37m[i] New MAC:\033[0m${new_mac}";
-	echo -e "\033[1;37m[i] Ok, scanning ${how_many} hosts for open port ${ports} with Zmap...\033[0m";
-	echo -e "\033[1;37m[i] \033[1;37mUsing blacklist:\033[0m ${blacklist}";
+	new_mac=$(sudo macchanger ${iface} -r | tail -n 1 | cut -f3- -d ' ' | cut -f1 -d '(')
+	echo -e "\033[1;37m${pure_art}\n\n\033[1;37m[i] New MAC:\033[0m${new_mac}"
+	echo -e "\033[1;37m[i] Ok, scanning ${how_many} hosts for open port ${ports} with Zmap...\033[0m"
+	echo -e "\033[1;37m[i] \033[1;37mUsing blacklist:\033[0m ${blacklist}"
 	#echo -e "\033[1;37m[i] \033[1;37mPackets per second: ${packets_per_second}\033[0m";
 	#echo -e "\033[1;37m[i] \033[1;37mSpeed: ${bytes_per_second} per second\033[0m";
 
-	sudo zmap -i ${iface} -G ${new_mac} -q -b ${blacklist} -n ${how_many} -p ${ports} -o zmap;
+	sudo zmap -i ${iface} -G ${new_mac} -q -b ${blacklist} -n ${how_many} -p ${ports} -o zmap
 	for i in $(cat zmap | wc -l);
-	 	do echo -e "\033[1;37m[i] Hosts found:\033[0m  $i";
-	 	zmap_hosts=$i;
+	 	do echo -e "\033[1;37m[i] Hosts found:\033[0m  $i"
+	 	zmap_hosts=$i
 	 	continue
-	done;
+	done
 }
 
 nmap_country_only_scan () {
 
         # scan info
-	echo -e "\033[1;37m[i] \033[1;37mOk, scanning ${which_country} ( ${country} ) on port ${ports} with Nmap...\033[0m";
+	echo -e "\033[1;37m[i] \033[1;37mOk, scanning ${which_country} ( ${country} ) on port ${ports} with Nmap...\033[0m"
 	# show Nmap version
 	echo -e "\033[1;37m[i] $(nmap -V | head -n 1)\033[m" 
 	# large scale nmap scan, check if a blacklist is available
 	if [ -f 'blacklist.txt' ]; then 
-	    sudo nmap -D RND,ME,RND,RND,RND,RND -Pn -T5 --host-timeout=10 --max-retries=1 -p ${ports} -iL $country_ipv4_directory$country --excludefile=${blacklist} -n --open -oA og > /dev/null;
+	    sudo nmap -D RND,ME,RND,RND,RND,RND -Pn -T5 --host-timeout=1 --max-retries=1 -p ${ports} -iL $country_ipv4_directory$country --excludefile=${blacklist} -n --open -oA og > /dev/null;
 	else 
         # scan without a blacklist
             echo -e "\033[1;31m[!] No blacklist is used!\033[0m"
-	    sudo nmap -D RND,ME,RND,RND,RND,RND -Pn -T5 --host-timeout=10 --max-retries=1 -p ${ports} -iL $country_ipv4_directory$country -n --open -oA og > /dev/null;
+	    sudo nmap -D RND,ME,RND,RND,RND,RND -Pn -T5 --host-timeout=1 --max-retries=1 -p ${ports} -iL $country_ipv4_directory$country -n --open -oA og > /dev/null
 	fi
 
 	# write ip's to file
@@ -236,34 +241,32 @@ nmap_country_only_scan () {
 	    rm hosts.lst; done
 	touch hosts.lst;
 	for i in $(cat og.gnmap |grep -iE "(status)"); do
-		echo $i | grep -oE '((1?[0-9][0-9]?|2[0-4][0-9]|25[0-5])\.){3}(1?[0-9][0-9]?|2[0-4][0-9]|25[0-5])' >> hosts.lst; done;
-		echo -e "\033[1;37m[i] File with hosts:\033[0m hosts.lst";
+		echo $i | grep -oE '((1?[0-9][0-9]?|2[0-4][0-9]|25[0-5])\.){3}(1?[0-9][0-9]?|2[0-4][0-9]|25[0-5])' >> hosts.lst 
+	done
+	echo -e "\033[1;37m[i] File with hosts:\033[0m hosts.lst"
 
 	# count hosts
-	for hosts in $(cat og.gnmap | grep -iE "(Ports:)" | uniq | wc -l);
-	do echo -e "\033[1;92m[+] Hosts: \033[0m $hosts";
-	
-	# show scan time
-	echo -e "\033[1;37m[i] Time:\033[0m " $(cat og.gnmap | tail -n 1 | cut -f19- -d ' ')
-
-	# scan info
-	echo -e "\033[1;37m[i] \033[1;37mOk, scanning ${hosts} hosts on port ${ports} for ${service} with Nmap...\033[0m";
-	done;
+	for hosts in $(cat og.gnmap | grep -iE "(Ports:)" | uniq | wc -l); do 
+	    echo -e "\033[1;92m[+] Hosts: \033[0m $hosts"
+	    # show scan time
+	    echo -e "\033[1;37m[i] Time:\033[0m " $(cat og.gnmap | tail -n 1 | cut -f19- -d ' ')
+        # scan info
+	    echo -e "\033[1;37m[i] \033[1;37mOk, scanning ${hosts} hosts on port ${ports} for ${service} with Nmap...\033[0m"
+	done
 
 	# service detection scan
-	sudo nmap -D RND,ME,RND,RND,RND,RND -Pn -T5 --host-timeout=30 -p ${ports} -sV --version-intensity=4 -sS -iL hosts.lst -n --open -oA og > /dev/null;
+	sudo nmap -D RND,ME,RND,RND,RND,RND -Pn -T5 --host-timeout=30 -p ${ports} -sV --version-intensity=4 -sS -iL hosts.lst -n --open -oA og > /dev/null
 
 	# grep services
 	if cat og.gnmap | grep -iE "(${service})" | sed '/Nmap\|Up/d'; then 
-	
-	# show hosts with services found
-	hosts=$(echo -e "\n\033[1;92m[+] ${service} found:\033[0m " $(cat og.gnmap | grep -iE "(${service})" | sed '/Nmap\|Up/d'| grep -oE '((1?[0-9][0-9]?|2[0-4][0-9]|25[0-5])\.){3}(1?[0-9][0-9]?|2[0-4][0-9]|25[0-5])' | uniq)); echo $hosts;
-        fi;	
+	    # show hosts with services found
+	    hosts=$(echo -e "\n\033[1;92m[+] ${service} found:\033[0m " $(cat og.gnmap | grep -iE "(${service})" | sed '/Nmap\|Up/d'| grep -oE '((1?[0-9][0-9]?|2[0-4][0-9]|25[0-5])\.){3}(1?[0-9][0-9]?|2[0-4][0-9]|25[0-5])' | uniq)); echo $hosts;
+    fi	
 	
 	# count hosts with services found
-	if i=$(cat og.gnmap | grep -iE "(${service})" | sed '/Nmap\|Up/d'| grep -oE '((1?[0-9][0-9]?|2[0-4][0-9]|25[0-5])\.){3}(1?[0-9][0-9]?|2[0-4][0-9]|25[0-5])' | uniq | wc -w);
-	then echo -e "\033[1;92m[+] Hosts with services found: \033[0m $i";
-	fi;
+	if i=$(cat og.gnmap | grep -iE "(${service})" | sed '/Nmap\|Up/d'| grep -oE '((1?[0-9][0-9]?|2[0-4][0-9]|25[0-5])\.){3}(1?[0-9][0-9]?|2[0-4][0-9]|25[0-5])' | uniq | wc -w); then 
+	    echo -e "\033[1;92m[+] Hosts with services found: \033[0m $i"
+	fi
 
 	# show scan time
 	echo -e "\033[1;37m[i] Time:\033[0m " $(cat og.gnmap | tail -n 1 | cut -f19- -d ' ');
@@ -273,7 +276,8 @@ nmap_country_only_scan () {
 	    rm $file; done
 	touch $file;
 	for i in $(cat og.gnmap | grep -iE "(${service})" | sed '/Nmap\|Up/d');do 
-	    echo $i | grep -oE '((1?[0-9][0-9]?|2[0-4][0-9]|25[0-5])\.){3}(1?[0-9][0-9]?|2[0-4][0-9]|25[0-5])' | uniq >> $file; done;
+	    echo $i | grep -oE '((1?[0-9][0-9]?|2[0-4][0-9]|25[0-5])\.){3}(1?[0-9][0-9]?|2[0-4][0-9]|25[0-5])' | uniq >> $file; 
+	done
 	echo -e "\033[1;37m[i] File with service hosts:\033[0m $file";
 
 }
@@ -286,17 +290,17 @@ nmap_country_only_scan () {
 ftp_scan () { 
 
     # scan info
-    echo -e "${pure_art}\n\n\033[1;37m[i] \033[1;37mOk, scanning ${how_many} hosts on port ${ports} with Nmap for vulnerabilities...\033[0m";
+    echo -e "${pure_art}\n\n\033[1;37m[i] \033[1;37mOk, scanning ${how_many} hosts on port ${ports} with Nmap for vulnerabilities...\033[0m"
     echo -e "\033[1;37m[i] Vuln scan activ: Anonymous FTP login \033[0m\n";
         
 
     # ftp scan with NSE scripts	
-    sudo nmap -mac -Pn -T5 --host-timeout=30 -p ${ports} -sV --version-intensity=4 -sC --script=ftp-anon -sS -iR ${how_many} -n --open -oA og > /dev/null;
+    sudo nmap -mac -Pn -T5 --host-timeout=30 -p ${ports} -sV --version-intensity=4 -sC --script=ftp-anon -sS -iR ${how_many} -n --open -oA og > /dev/null
 
     # show services	
     if cat og.gnmap | grep -iE "(${service})"; then
-        echo -e "\n\033[1;92m[+] ftp found:\033[0m " $(cat og.gnmap | grep -iE "(${service})" | cut -f2 -d ' '); 
-    fi;
+        echo -e "\n\033[1;92m[+] ftp found:\033[0m " $(cat og.gnmap | grep -iE "(${service})" | cut -f2 -d ' ');
+    fi
 
     # show Anonymous FTP login
     anon=$(echo -e "\n\033[1;92m[+] Anon found:\033[0m " $(cat og.nmap > /dev/null);
@@ -307,7 +311,7 @@ ftp_scan () {
     # for i in $(echo $anon |head -n 3 | cut -f5 -d ' '); do
     # echo $i | grep -oE '((1?[0-9][0-9]?|2[0-4][0-9]|25[0-5])\.){3}(1?[0-9][0-9]?|2[0-4][0-9]|25[0-5])' >> anon_ftp.lst; done;
     anon=$(echo -e "\n\033[1;92m[+] Anon found:\033[0m " $(cat og.nmap > /dev/null);
-    cat og.nmap | grep -B 5 -iE "(code 230)"); echo $anon | grep -oE '((1?[0-9][0-9]?|2[0-4][0-9]|25[0-5])\.){3}(1?[0-9][0-9]?|2[0-4][0-9]|25[0-5])' >> anon_ftp.lst;
+    cat og.nmap | grep -B 5 -iE "(code 230)"); echo $anon | grep -oE '((1?[0-9][0-9]?|2[0-4][0-9]|25[0-5])\.){3}(1?[0-9][0-9]?|2[0-4][0-9]|25[0-5])' >> anon_ftp.lst
 
     echo -e "\033[1;37m[i] File with hosts:\033[0m $file";
 		
@@ -318,6 +322,7 @@ ftp_scan () {
 metasploit () {
 
     echo -e "\033[1;37m[?] Import hosts to Metasploit? \033[0m"
+    echo 'for debug: File: ' $file
     read msf
     # fix exit when no import is needed
     echo -e "\033[1;37m(1) Import hosts with services found only without importing service informations, but u can scan again for more precise service informations\n(2) Import all hosts found ( all services found will be imported! ) \033[0m"
@@ -332,7 +337,7 @@ metasploit () {
 	        sudo msfdb init; done
             echo -e "\033[1;37m[i] Starting msfconsole... \033[0m";
 	    # import hosts with services found only and do a more precise service scan
-	    echo -e "workspace -a finder\nworkspace finder\ndb_import $file\ndb_nmap -Pn -sS -sV -F -T4 -iL $file\nservices $hosts" > test.rc; 
+	    echo -e "workspace -a finder\nworkspace finder\ndb_import $file\ndb_nmap -Pn -sS -sV --top-ports=25 -T4 -iL $file\nservices -S $service" > test.rc; 
 	    msfconsole -q -x 'resource test.rc';
         elif [ "${precise_service_scan}" == "no" ]; then
 	    while [[ $(sudo msfdb status |grep dead) ]]; do
@@ -374,29 +379,67 @@ whois_scanner () {
 }
 
 camera_browser () {
-
     # check if any cameras are found and grep the IP addresses
-    if hosts=($(cat $HOME/finder_scans/og.gnmap | grep -iE "(cam)" | sed '/Nmap\|Up/d'| grep -oE '((1?[0-9][0-9]?|2[0-4][0-9]|25[0-5])\.){3}(1?[0-9][0-9]?|2[0-4][0-9]|25[0-5])' | uniq)); then
+    camera_ip=$(cat og.gnmap | grep -iE "(Camera|camera|Cameras|cameras|IPCam|IPcam|IpCam|webcam|webcams|Webcam|Webcams)" | sed '/Nmap\|Up/d'| grep -oE '((1?[0-9][0-9]?|2[0-4][0-9]|25[0-5])\.){3}(1?[0-9][0-9]?|2[0-4][0-9]|25[0-5])' | uniq)
+    if [[ $camera_ip != "" ]]; then
+        echo -e "\033[1;92m[+] Cameras found: \033[0m" $camera_ip
         # if no cameras being found print that information
-        if [ -z $hosts ]; then
-            echo -e "\033[1;37m[i] No Cameras found. \033[0m"
-        else
-            # if cameras being found, show them and ask for opening them in a browser
-            echo -e "\033[1;92m[+] Cameras found: \033[0m" $hosts
-                for host in $hosts; do
-                    echo -e "\033[1;37m[?] Do u wanna open all found cams in your Browser? \033[0m"
-                    read open_browser
-                    if [[ $open_browser == "yes" ]]; then
-                        # add 'http://' at the begin of every IP address
-                        for i in $hosts; do
-                            url=$(echo 'http://'$i)
-                            xdg-open $url
-                        done
-                    fi
+        # for host in $hosts; do
+            # echo -e "\033[1;92m[+] Cameras found: \033[0m" $host
+        echo -e "\033[1;37m[?] Do u wanna open all found cams in your Browser? \033[0m"
+        read open_browser
+            if [[ $open_browser == "yes" ]]; then
+                # add 'http://' at the begin of every IP address
+                for i in $hosts; do
+                    url=$(echo 'http://'$i)
+                    xdg-open $url
                 done
+            fi
+        # done    
+    else
+        echo -e "\033[1;37m[i] No Cameras found. \033[0m"
+        # if cameras being found, show them and ask for opening them in a browser
+        
+    fi
+}
+
+camera_hikvision_info_disclosure_scanner () {
+    
+    # check if any Hikvision cameras are found and grep the IP addresses
+    hikvision_ip=$(cat og.gnmap | grep -iE hikvision | sed '/Nmap\|Up/d'| grep -oE '((1?[0-9][0-9]?|2[0-4][0-9]|25[0-5])\.){3}(1?[0-9][0-9]?|2[0-4][0-9]|25[0-5])' | uniq)
+    # if Hikvision cameras being found, show them and ask for scanning them in metasploit for cve_2017_7921
+    hikvision=$(cat og.gnmap | grep -iE 'hikvision')
+
+    if [[ $hikvision != "" ]]; then
+        if [[ $(echo $hikvision | grep -iE hikvision) != "" ]]; then
+            # write ip's with found hivision devices to file
+            add_quotes_to_file_name=$HOME/'hikvision_file.lst' 
+            hikvision_file=$(echo $add_quotes_to_file_name)
+            while [ -f $hikvision_file ]; do
+	            rm hikvision_file.lst
+            done
+            touch hikvision_file.lst
+	        for i in $(cat og.gnmap | grep -iE hikvision); do 
+	            echo $i | grep -oE '((1?[0-9][0-9]?|2[0-4][0-9]|25[0-5])\.){3}(1?[0-9][0-9]?|2[0-4][0-9]|25[0-5])'| sed '/Nmap\|Up/d' | uniq >> hikvision_file.lst
+		    done
+            echo -e '[debug] hikvision ips: ' $(cat hikvision_file.lst)
+            echo -e "\033[1;92m[+] Hikvision host found: \033[0m" $(cat og.gnmap | grep -iE hikvision | grep -oE '((1?[0-9][0-9]?|2[0-4][0-9]|25[0-5])\.){3}(1?[0-9][0-9]?|2[0-4][0-9]|25[0-5])' | sed '/Nmap\|Up/d' | uniq)
+            echo -e "\033[1;92m[+] Hikvision product found: \033[0m" $(cat og.gnmap | grep -iE hikvision| sed '/Nmap\|Up/d')
+            echo -e "\033[1;37m[?] Do u wanna use hikvision_info_disclosure_cve_2017_7921 module in Metasploit? \033[0m"
+            read hikvision_info_disclosure_cve_2017_7921
+            if [[ $hikvision_info_disclosure_cve_2017_7921 == "yes" ]]; then
+                for host in $(cat hikvision_file.lst); do
+                    echo -e "workspace -a finder\nworkspace finder\nuse auxiliary/gather/hikvision_info_disclosure_cve_2017_7921\nset rhosts $host\ncheck\nexit" > hikvision.rc
+                    msfconsole -q -x 'resource hikvision.rc' | grep '*|+|-' 
+				done
+            else
+                echo 'deine mutter 1'
+            fi
+        else
+            echo 'deine mutter 2'
         fi
     else
-        echo "og.gnmap not found"
+        echo 'deine mutter 3'
     fi
 }
 
