@@ -8,7 +8,7 @@
 # Large scale discovery and vulnerability scanning 
 # and more... 
 # +++ work in progress +++
-version='0.3.0-pre-alpha'
+version='0.3.1-pre-alpha'
 ######################################################################################
 # miscellaneous
 ######################################################################################
@@ -111,11 +111,13 @@ nmap_random_scan () {
 	echo -e "\033[1;37m[i] $(nmap -V | head -n 1)\033[m" 
 	# largeiscale nmap scan, check if a blacklist is available
 	if [ -f 'blacklist.txt' ]; then 
-	    sudo nmap -D RND,ME,RND,RND,RND,RND -Pn -T5 --host-timeout=1m --max-retries=1 -p ${ports} -iR ${how_many} --excludefile=${blacklist} -n --open -oA og > /dev/null;
+	    # -T5 default is: -max-rtt-timeout 300ms --min-rtt-timeout 50ms --initial-rtt-timeout 250ms --max-retries 2 --host-timeout 15m --script-timeout 10m
+	    sudo nmap -D RND,ME,RND,RND,RND,RND -Pn --defeat-rst-ratelimit --max-rtt-timeout 150ms --min-rtt-timeout 40ms --initial-rtt-timeout 200ms --host-timeout=30s --max-retries=1 -p ${ports} -iR ${how_many} --excludefile=${blacklist} -n --open -oA og > /dev/null;
 	else 
         # scan without a blacklist
             echo -e "\033[1;31m[!] No blacklist is used!\033[0m"
-	    sudo nmap -D RND,ME,RND,RND,RND,RND -Pn -T5 --host-timeout=1m --max-retries=1 -p ${ports} -iR ${how_many} -n --open -oA og > /dev/null
+		# -T5 default is: -max-rtt-timeout 300ms --min-rtt-timeout 50ms --initial-rtt-timeout 250ms --max-retries 2 --host-timeout 15m --script-timeout 10m
+	    sudo nmap -D RND,ME,RND,RND,RND,RND -Pn --defeat-rst-ratelimit --max-rtt-timeout 150ms --min-rtt-timeout 40ms --initial-rtt-timeout 200ms --host-timeout=30s --max-retries=1 -p ${ports} -iR ${how_many} -n --open -oA og > /dev/null
 	fi
 
 	# write ip's to file
@@ -141,7 +143,7 @@ nmap_random_scan () {
 
 	# service detection scan
 	# -T5 default is: -max-rtt-timeout 300ms --min-rtt-timeout 50ms --initial-rtt-timeout 250ms --max-retries 2 --host-timeout 15m --script-timeout 10m
-	sudo nmap -D RND,ME,RND,RND,RND,RND -Pn --defeat-rst-ratelimit --max-rtt-timeout 300ms --initial-rtt-timeout 250ms --host-timeout=2m --script-timeout=2m --max-retries=1 -p80 -sV --version-intensity=4 -sS -iL hosts.lst -n --open -oA og > /dev/null
+	sudo nmap -D RND,ME,RND,RND,RND,RND -Pn --defeat-rst-ratelimit --max-rtt-timeout 300ms --initial-rtt-timeout 250ms --host-timeout=30s --script-timeout=30s --max-retries=1 -p80 -sV --version-intensity=4 -sS -iL hosts.lst -n --open -oA og > /dev/null
 
 	# grep services
 	if cat og.gnmap | grep -iE "(${service})" | sed '/Nmap\|Up/d'; then 
@@ -337,7 +339,7 @@ metasploit () {
 	        sudo msfdb init; done
             echo -e "\033[1;37m[i] Starting msfconsole... \033[0m";
 	    # import hosts with services found only and do a more precise service scan
-	    echo -e "workspace -a finder\nworkspace finder\ndb_import $file\ndb_nmap -Pn -sS -sV --top-ports=25 -T4 -iL $file\nservices -S $service" > test.rc; 
+	    echo -e "workspace -a finder\nworkspace finder\ndb_import $file\ndb_nmap -Pn -n -sS -sV --top-ports=25 -T5 -iL $file\nservices -S $service" > test.rc; 
 	    msfconsole -q -x 'resource test.rc';
         elif [ "${precise_service_scan}" == "no" ]; then
 	    while [[ $(sudo msfdb status |grep dead) ]]; do
@@ -409,6 +411,9 @@ camera_hikvision_info_disclosure_scanner () {
     hikvision_ip=$(cat og.gnmap | grep -iE hikvision | sed '/Nmap\|Up/d'| grep -oE '((1?[0-9][0-9]?|2[0-4][0-9]|25[0-5])\.){3}(1?[0-9][0-9]?|2[0-4][0-9]|25[0-5])' | uniq)
     # if Hikvision cameras being found, show them and ask for scanning them in metasploit for cve_2017_7921
     hikvision=$(cat og.gnmap | grep -iE 'hikvision')
+	# create hikvision file
+    hikvision_file=$(cat og.gnmap | grep -iE hikvision | sed '/Nmap\|Up/d'| grep -oE '((1?[0-9][0-9]?|2[0-4][0-9]|25[0-5])\.){3}(1?[0-9][0-9]?|2[0-4][0-9]|25[0-5])' | uniq) >> hikvision_file.lst
+
 
     if [[ $hikvision != "" ]]; then
         if [[ $(echo $hikvision | grep -iE hikvision) != "" ]]; then
@@ -419,18 +424,16 @@ camera_hikvision_info_disclosure_scanner () {
 	            rm hikvision_file.lst
             done
             touch hikvision_file.lst
-	        for i in $(cat og.gnmap | grep -iE hikvision); do 
-	            echo $i | grep -oE '((1?[0-9][0-9]?|2[0-4][0-9]|25[0-5])\.){3}(1?[0-9][0-9]?|2[0-4][0-9]|25[0-5])'| sed '/Nmap\|Up/d' | uniq >> hikvision_file.lst
-		    done
-            echo -e '[debug] hikvision ips: ' $(cat hikvision_file.lst)
+            echo -e "[debug] hikvision_file: " $(echo $hikvision_file)
+            echo -e '[debug] hikvision ips: ' $(echo $hikvision_ip)
             echo -e "\033[1;92m[+] Hikvision host found: \033[0m" $(cat og.gnmap | grep -iE hikvision | grep -oE '((1?[0-9][0-9]?|2[0-4][0-9]|25[0-5])\.){3}(1?[0-9][0-9]?|2[0-4][0-9]|25[0-5])' | sed '/Nmap\|Up/d' | uniq)
             echo -e "\033[1;92m[+] Hikvision product found: \033[0m" $(cat og.gnmap | grep -iE hikvision| sed '/Nmap\|Up/d')
             echo -e "\033[1;37m[?] Do u wanna use hikvision_info_disclosure_cve_2017_7921 module in Metasploit? \033[0m"
             read hikvision_info_disclosure_cve_2017_7921
             if [[ $hikvision_info_disclosure_cve_2017_7921 == "yes" ]]; then
-                for host in $(cat hikvision_file.lst); do
+                for host in $(echo $hikvision_ip); do
                     echo -e "workspace -a finder\nworkspace finder\nuse auxiliary/gather/hikvision_info_disclosure_cve_2017_7921\nset rhosts $host\ncheck\nexit" > hikvision.rc
-                    msfconsole -q -x 'resource hikvision.rc' | grep '*|+|-' 
+                    msfconsole -q -x 'resource hikvision.rc' | grep -iE "(target|error)" 
 				done
             else
                 echo 'deine mutter 1'
