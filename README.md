@@ -8,3 +8,7 @@
 #### - Data analysis of the stuff that was found
 #### - A database to store all the information
 
+### Screenshots:
+
+![1](https://github.com/skybreakjohnson/finder/assets/16686997/a349d132-bfe5-436d-a236-09ba2c07aa25)
+![2](https://github.com/skybreakjohnson/finder/assets/16686997/9f2fffd4-8fbd-49d5-80c7-77a7259fda02)
